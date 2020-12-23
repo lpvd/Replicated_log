@@ -56,6 +56,8 @@ handle_request(http::request<http::string_body>&& req,
 
             body = "CONGRATS!";
             size_t wc_idx = 0;
+
+            // Schedule write to secondaries
             for (auto& n : context->m_nodes)
             {
                 if (wc_idx >= wc)

@@ -33,15 +33,15 @@ RServer::start(int argc, char* argv[])
 
     if (m_is_root)
     {
-        std::vector<std::string> loc;
+        std::vector<std::string> parts;
         for (auto& s : strs)
         {
-            boost::split(loc, s, boost::is_any_of(":"));
-            auto ip = net::ip::make_address(loc[0]);
-            unsigned short port = std::stoi(loc[1]);
+            boost::split(parts, s, boost::is_any_of(":"));
+            auto ip = net::ip::make_address(parts[0]);
+            unsigned short port = std::stoi(parts[1]);
 
-            m_nodes.emplace_back(RNode{loc[0], loc[1]});
-            loc.clear();
+            m_nodes.emplace_back(RNode{parts[0], parts[1]});
+            parts.clear();
         }
     }
     else

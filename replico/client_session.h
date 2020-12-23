@@ -10,6 +10,9 @@ using tcp = boost::asio::ip::tcp;  // from <boost/asio/ip/tcp.hpp>
 
 class RServer;
 
+// One ClientSession per request from master to secondary.
+// Asynchronous. Once the session receive responce -
+// it updates wc of the log message in master logs container
 class ClientSession : public std::enable_shared_from_this<ClientSession>
 {
     tcp::resolver m_resolver;
@@ -21,8 +24,6 @@ class ClientSession : public std::enable_shared_from_this<ClientSession>
     size_t m_id;
 
 public:
-    // Objects are constructed with a strand to
-    // ensure that handlers do not execute concurrently.
     explicit ClientSession(RServer* context);
 
     // Start the asynchronous operation

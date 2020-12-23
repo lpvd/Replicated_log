@@ -34,9 +34,13 @@ ClientSession::run(const std::string& host,
     m_id = id;
     m_req.version(11);
     m_req.method(http::verb::post);
+
+    // command (addlog)
     m_req.target(target);
     m_req.set(http::field::host, host);
     m_req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+
+    // body - the message itself
     auto size = body.size();
     m_req.body() = std::move(body);
     m_req.content_length(size);
@@ -97,6 +101,8 @@ ClientSession::on_read(beast::error_code ec, std::size_t bytes_transferred)
 
     // Gracefully close the socket
     m_stream.socket().shutdown(tcp::socket::shutdown_both, ec);
+
+    // Update wc of the log in main node
     m_context->update_wc(m_id);
 
     // not_connected happens sometimes so don't bother reporting it.

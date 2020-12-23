@@ -47,11 +47,20 @@ struct LogEntry
     {
     }
 
+    // The log message itself
     std::string m_data;
+
+    // Expected write concern
     size_t m_expected_wc;
+
+    // Number of successful posts to secondaries
     size_t m_actual_wc;
 };
 
+// One node from cluster.
+// Can be master or secondary.
+// Communication between user and secondary: http
+// Communication between main and secondary nodes: http
 class RServer
 {
 public:
@@ -71,8 +80,13 @@ public:
     std::shared_ptr<net::io_context> m_ioc;
     std::vector<std::thread> m_executors;
 
+    // Endpoint of this object
     tcp::endpoint m_endpoint;
+
+    // For secondary - master's endpoint
     tcp::endpoint m_root_endpoint;
+
+    // For master - secondaries
     std::vector<RNode> m_nodes;
 
     void
@@ -91,6 +105,8 @@ public:
         return size;
     }
 
+    // Update write concern
+    // If request was successful - update wc for each log
     void
     update_wc(size_t id)
     {
