@@ -1,5 +1,6 @@
 #include "replico_server.h"
 #include <random>
+#include <boost/property_tree/json_parser.hpp>
 
 namespace
 {
@@ -79,22 +80,35 @@ handle_request(http::request<http::string_body>&& req,
     {
         if (isAdd)
         {
-            std::string log = req.body();
-            {
-                context->add_log(log);
-            }
+            boost::property_tree::ptree pt;
+            std::stringstream ss;
+            ss << req.body();
+            read_json(ss, pt);
+
+            auto log = pt.get<std::string>("data");
+            auto wc = pt.get<size_t>("wc");
+            auto id = context->add_log(log, wc);
+
             body = "CONGRATS!";
+            size_t wc_idx = 0;
             for (auto& n : context->m_nodes)
             {
-                std::make_shared<ClientSession>(*context->m_ioc)->run(n.ip, n.port, "/addlog", log);
+                if (wc_idx >= wc)
+                {
+                    break;
+                }
+                std::make_shared<ClientSession>(context)->run(n.ip, n.port, "/addlog", log, id);
+                ++wc_idx;
             }
         }
         else if (isGet)
         {
-            std::vector<std::string> reg = context->get_logs();
+            auto reg = context->get_logs();
             for (auto& l : reg)
             {
-                body += l;
+                body += l.m_data;
+                body += " [" + std::to_string(l.m_actual_wc) + "/" +
+                        std::to_string(l.m_expected_wc) + "]";
                 body += "\n";
             }
         }
@@ -113,10 +127,10 @@ handle_request(http::request<http::string_body>&& req,
         }
         else if (isGet)
         {
-            std::vector<std::string> reg = context->get_logs();
+            auto reg = context->get_logs();
             for (auto& l : reg)
             {
-                body += l;
+                body += l.m_data;
                 body += "\n";
             }
         }
@@ -281,4 +295,30 @@ LogTimeScope::~LogTimeScope()
         std::cout << (m_isRoot ? "[ROOT]" : "[NODE]") << " Executing " << m_name << " : "
                   << dur.count() << std::endl;
     }
+}
+
+ClientSession::ClientSession(RServer* context)
+    : m_resolver(net::make_strand(*context->m_ioc))
+    , m_stream(net::make_strand(*context->m_ioc))
+    , m_context(context)
+{
+}
+
+void
+ClientSession::on_read(beast::error_code ec, std::size_t bytes_transferred)
+{
+    boost::ignore_unused(bytes_transferred);
+
+    if (ec)
+        return fail(ec, "read");
+
+    // Gracefully close the socket
+    m_stream.socket().shutdown(tcp::socket::shutdown_both, ec);
+    m_context->update_wc(m_id);
+
+    // not_connected happens sometimes so don't bother reporting it.
+    if (ec && ec != beast::errc::not_connected)
+        return fail(ec, "shutdown");
+
+    // If we get here then the connection is closed gracefully
 }

@@ -5,6 +5,7 @@
 #include <boost/beast/version.hpp>
 #include <boost/asio/connect.hpp>
 #include <boost/asio/ip/tcp.hpp>
+#include <boost/property_tree/json_parser.hpp>
 #include <cstdlib>
 #include <iostream>
 #include <string>
@@ -16,6 +17,20 @@ namespace
 std::string
 send_log(const std::string& host, const std::string& port, const std::string& log_content)
 {
+    boost::property_tree::ptree pt;
+    boost::property_tree::ptree wc_node, log_node;
+
+    wc_node.put("", 3);
+    pt.add_child("wc", wc_node);
+
+    log_node.put("", log_content);
+    pt.add_child("data", log_node);
+    std::stringstream ss;
+
+    write_json(ss, pt);
+
+    std::string data = ss.str();
+
     namespace beast = boost::beast;  // from <boost/beast.hpp>
     namespace http = beast::http;    // from <boost/beast/http.hpp>
     namespace net = boost::asio;     // from <boost/asio.hpp>
@@ -42,8 +57,8 @@ send_log(const std::string& host, const std::string& port, const std::string& lo
     http::request<http::string_body> req{http::verb::post, "/addlog", 11};
     req.set(http::field::host, host);
     req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
-    req.body() = log_content;
-    req.content_length(log_content.size());
+    req.body() = data;
+    req.content_length(data.size());
 
     // Send the HTTP request to the remote host
     http::write(stream, req);
@@ -166,10 +181,12 @@ TEST(ReplicoTests, HappyPath)
         expected.push_back(log);
     }
 
+    std::this_thread::sleep_for(std::chrono::seconds(60));
+
     auto root_logs = parse_and_sort(get_logs("127.0.0.1", "8081"));
     ASSERT_EQ(expected, root_logs);
 
-    std::this_thread::sleep_for(std::chrono::seconds(30));
+
 
     auto node1_logs = parse_and_sort(get_logs("127.0.0.1", "8082"));
     ASSERT_EQ(expected, node1_logs);

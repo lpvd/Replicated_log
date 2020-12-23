@@ -31,6 +31,7 @@ void fail(beast::error_code ec, char const* what);
 
 class RServer;
 
+// Auxiliary struct to automatically print execution time for each request
 struct LogTimeScope
 {
     typedef std::chrono::high_resolution_clock clock;
@@ -52,40 +53,40 @@ struct LogTimeScope
 
 class ClientSession : public std::enable_shared_from_this<ClientSession>
 {
-    tcp::resolver resolver_;
-    beast::tcp_stream stream_;
-    beast::flat_buffer buffer_;  // (Must persist between reads)
-    http::request<http::string_body> req_;
-    http::response<http::string_body> res_;
+    tcp::resolver m_resolver;
+    beast::tcp_stream m_stream;
+    beast::flat_buffer m_buffer;  // (Must persist between reads)
+    http::request<http::string_body> m_req;
+    http::response<http::string_body> m_res;
+    RServer* m_context;
+    size_t m_id;
 
 public:
     // Objects are constructed with a strand to
     // ensure that handlers do not execute concurrently.
-    explicit ClientSession(net::io_context& ioc)
-        : resolver_(net::make_strand(ioc))
-        , stream_(net::make_strand(ioc))
-    {
-    }
+    explicit ClientSession(RServer* context);
 
     // Start the asynchronous operation
     void
     run(const std::string& host,
         const std::string& port,
         const std::string& target,
-        std::string body)
+        std::string body,
+        size_t id)
     {
         // Set up an HTTP GET request message
-        req_.version(11);
-        req_.method(http::verb::post);
-        req_.target(target);
-        req_.set(http::field::host, host);
-        req_.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+        m_id = id;
+        m_req.version(11);
+        m_req.method(http::verb::post);
+        m_req.target(target);
+        m_req.set(http::field::host, host);
+        m_req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
         auto size = body.size();
-        req_.body() = std::move(body);
-        req_.content_length(size);
+        m_req.body() = std::move(body);
+        m_req.content_length(size);
 
         // Look up the domain name
-        resolver_.async_resolve(
+        m_resolver.async_resolve(
             host, port, beast::bind_front_handler(&ClientSession::on_resolve, shared_from_this()));
     }
 
@@ -96,10 +97,10 @@ public:
             return fail(ec, "resolve");
 
         // Set a timeout on the operation
-        stream_.expires_after(std::chrono::seconds(30));
+        m_stream.expires_after(std::chrono::seconds(30));
 
         // Make the connection on the IP address we get from a lookup
-        stream_.async_connect(
+        m_stream.async_connect(
             results, beast::bind_front_handler(&ClientSession::on_connect, shared_from_this()));
     }
 
@@ -110,10 +111,10 @@ public:
             return fail(ec, "connect");
 
         // Set a timeout on the operation
-        stream_.expires_after(std::chrono::seconds(30));
+        m_stream.expires_after(std::chrono::seconds(30));
 
         // Send the HTTP request to the remote host
-        http::async_write(stream_, req_,
+        http::async_write(m_stream, m_req,
                           beast::bind_front_handler(&ClientSession::on_write, shared_from_this()));
     }
 
@@ -126,27 +127,11 @@ public:
             return fail(ec, "write");
 
         // Receive the HTTP response
-        http::async_read(stream_, buffer_, res_,
+        http::async_read(m_stream, m_buffer, m_res,
                          beast::bind_front_handler(&ClientSession::on_read, shared_from_this()));
     }
 
-    void
-    on_read(beast::error_code ec, std::size_t bytes_transferred)
-    {
-        boost::ignore_unused(bytes_transferred);
-
-        if (ec)
-            return fail(ec, "read");
-
-        // Gracefully close the socket
-        stream_.socket().shutdown(tcp::socket::shutdown_both, ec);
-
-        // not_connected happens sometimes so don't bother reporting it.
-        if (ec && ec != beast::errc::not_connected)
-            return fail(ec, "shutdown");
-
-        // If we get here then the connection is closed gracefully
-    }
+    void on_read(beast::error_code ec, std::size_t bytes_transferred);
 };
 
 // Handles an HTTP server connection
@@ -279,10 +264,32 @@ private:
     void on_accept(beast::error_code ec, tcp::socket socket);
 };
 
+// Aux structure to be used by main (master) to store data about secondaries
 struct RNode
 {
     std::string ip;
     std::string port;
+};
+
+struct LogEntry
+{
+    LogEntry(std::string data, size_t expected_wc)
+        : m_data(std::move(data))
+        , m_expected_wc(expected_wc)
+        , m_actual_wc(1)
+    {
+    }
+
+    LogEntry(std::string data)
+        : m_data(std::move(data))
+        , m_expected_wc(0)
+        , m_actual_wc(0)
+    {
+    }
+
+    std::string m_data;
+    size_t m_expected_wc;
+    size_t m_actual_wc;
 };
 
 class RServer
@@ -312,10 +319,26 @@ public:
     add_log(std::string log)
     {
         std::lock_guard<std::mutex> g(m_log_lock);
-        m_logs.push_back(std::move(log));
+        m_logs.emplace_back(std::move(log));
     }
 
-    std::vector<std::string>
+    size_t
+    add_log(std::string log, size_t wc)
+    {
+        std::lock_guard<std::mutex> g(m_log_lock);
+        auto size = m_logs.size();
+        m_logs.emplace_back(std::move(log), wc);
+        return size;
+    }
+
+    void
+    update_wc(size_t id)
+    {
+        std::lock_guard<std::mutex> g(m_log_lock);
+        ++m_logs[id].m_actual_wc;
+    }
+
+    std::vector<LogEntry>
     get_logs()
     {
         std::lock_guard<std::mutex> g(m_log_lock);
@@ -323,7 +346,7 @@ public:
     }
 
     std::mutex m_log_lock;
-    std::vector<std::string> m_logs;
+    std::vector<LogEntry> m_logs;
 };
 
 // int
