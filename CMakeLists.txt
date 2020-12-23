@@ -19,6 +19,16 @@ add_subdirectory(googletest)
 
 # server 
 add_library(replico STATIC 
+    replico/helpers.cpp 
+    replico/helpers.h 
+    replico/log_time_scope.cpp 
+    replico/log_time_scope.h 
+    replico/client_session.cpp 
+    replico/client_session.h 
+    replico/server_session.cpp 
+    replico/server_session.h 
+    replico/server_listener.cpp 
+    replico/server_listener.h 
     replico/replico_server.cpp 
     replico/replico_server.h)
 
