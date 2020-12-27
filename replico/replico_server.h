@@ -91,8 +91,8 @@ public:
     add_log(std::string log)
     {
         std::lock_guard<std::mutex> g(m_log_lock);
-        m_logs.emplace_back(std::move(log));
         std::cout << "Added log: " << log << std::endl;
+        m_logs.emplace_back(std::move(log));
     }
 
     size_t
