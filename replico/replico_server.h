@@ -72,8 +72,6 @@ public:
         stop();
     }
 
-    std::string m_ip;
-    std::string m_port;
     bool m_is_root = false;
     int m_thread_number = 1;
 
@@ -94,6 +92,7 @@ public:
     {
         std::lock_guard<std::mutex> g(m_log_lock);
         m_logs.emplace_back(std::move(log));
+        std::cout << "Added log: " << log << std::endl;
     }
 
     size_t
@@ -124,23 +123,3 @@ public:
     std::mutex m_log_lock;
     std::vector<LogEntry> m_logs;
 };
-
-// int
-// smain(int argc, char* argv[])
-// {
-//     // Check command line arguments.
-//     if (argc != 5)
-//     {
-//         std::cerr << "Usage: replico <mode> <rootaddress> <nodeaddress1;nodeaddress2> <threads>"
-//                   << std::endl
-//                   << "Usage: replico <mode> <nodeadress> <rootaddress> <threads>" << std::endl
-//                   << std::endl
-//                   << "Example for main:\n"
-//                   << "    replico root 0.0.0.0:8080 0.0.0.0:8081;0.0.0.0:8082 1" << std::endl
-//                   << "    replico node 0.0.0.0:8081 0.0.0.0:8080 1" << std::endl
-//                   << "    replico node 0.0.0.0:8082 0.0.0.0:8080 1" << std::endl;
-//         return EXIT_FAILURE;
-//     }
-//
-//     return EXIT_SUCCESS;
-// }

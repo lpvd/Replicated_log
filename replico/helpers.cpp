@@ -5,14 +5,12 @@
 #include <random>
 #include <boost/property_tree/json_parser.hpp>
 
-
 namespace
 {
 std::uniform_int_distribution<int> dice_distribution(1, 10);
 std::mt19937 random_number_engine;  // pseudorandom number generator
 auto rgen = std::bind(dice_distribution, random_number_engine);
 }  // namespace
-
 
 extern std::mutex STDOUT_LOCK;
 
@@ -88,9 +86,13 @@ handle_request(http::request<http::string_body>&& req,
     {
         if (isAdd && remote_endpoint.address() == context->m_root_endpoint.address())
         {
-            std::this_thread::sleep_for(std::chrono::seconds(rgen()));
-            std::string log = req.body();
-            context->add_log(log);
+            if (req["pwd"] == "rootovich")
+            {
+                // Random sleep on secondary node before handling the request.
+                std::this_thread::sleep_for(std::chrono::seconds(rgen()));
+                std::string log = req.body();
+                context->add_log(log);
+            }
         }
         else if (isGet)
         {

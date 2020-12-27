@@ -6,7 +6,7 @@
 
 namespace
 {
-    const std::string ROOT = "root";
+const std::string ROOT = "root";
 }  // namespace
 
 bool
@@ -28,6 +28,7 @@ RServer::start(int argc, char* argv[])
 
         m_endpoint = tcp::endpoint{ip, port};
     }
+    strs.clear();
 
     boost::split(strs, argv[3], boost::is_any_of(m_is_root ? ";" : ":"));
 
@@ -84,7 +85,6 @@ RServer::stop()
         return false;
     }
 
-    m_ioc->stop();
     for (auto& t : m_executors)
     {
         t.join();
@@ -92,5 +92,3 @@ RServer::stop()
 
     return true;
 }
-
-

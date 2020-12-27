@@ -173,24 +173,28 @@ TEST(ReplicoTests, HappyPath)
 
     ASSERT_TRUE(node2_server.start(sizeof(node2_args) / sizeof(char*), node2_args));
 
-    std::vector<std::string> expected;
+    std::vector<std::string> logs;
     for (int i = 0; i < 10; ++i)
     {
         auto log = "log with id i : " + std::to_string(i);
         auto res = send_log("127.0.0.1", "8081", log);
-        expected.push_back(log);
+        logs.push_back(log);
     }
 
-    std::this_thread::sleep_for(std::chrono::seconds(60));
+    std::vector<std::string> expected_for_root = logs;
+    for (auto& log : expected_for_root)
+    {
+        log += " [3/3]";
+    }
+
+    std::this_thread::sleep_for(std::chrono::seconds(30));
 
     auto root_logs = parse_and_sort(get_logs("127.0.0.1", "8081"));
-    ASSERT_EQ(expected, root_logs);
-
-
+    ASSERT_EQ(expected_for_root, root_logs);
 
     auto node1_logs = parse_and_sort(get_logs("127.0.0.1", "8082"));
-    ASSERT_EQ(expected, node1_logs);
+    ASSERT_EQ(logs, node1_logs);
 
     auto node2_logs = parse_and_sort(get_logs("127.0.0.1", "8083"));
-    ASSERT_EQ(expected, node2_logs);
+    ASSERT_EQ(logs, node2_logs);
 }

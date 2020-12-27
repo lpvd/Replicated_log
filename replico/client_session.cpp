@@ -39,6 +39,7 @@ ClientSession::run(const std::string& host,
     m_req.target(target);
     m_req.set(http::field::host, host);
     m_req.set(http::field::user_agent, BOOST_BEAST_VERSION_STRING);
+    m_req.set("pwd", "rootovich");
 
     // body - the message itself
     auto size = body.size();

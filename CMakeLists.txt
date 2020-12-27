@@ -18,7 +18,7 @@ find_package(Boost COMPONENTS system date_time REQUIRED)
 add_subdirectory(googletest)
 
 # server 
-add_library(replico STATIC 
+add_executable(replico 
     replico/helpers.cpp 
     replico/helpers.h 
     replico/log_time_scope.cpp 
@@ -30,11 +30,12 @@ add_library(replico STATIC
     replico/server_listener.cpp 
     replico/server_listener.h 
     replico/replico_server.cpp 
-    replico/replico_server.h)
+    replico/replico_server.h
+    replico/main.cpp)
 
 target_link_libraries(replico ${Boost_SYSTEM_LIBRARY} ${Boost_DATE_TIME_LIBRARY})
 target_include_directories(replico PUBLIC  $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/replico>)
 
 #tests
-add_executable(replico_tests test_main.cpp)
-target_link_libraries(replico_tests replico gtest gtest_main)
+#add_executable(replico_tests test_main.cpp)
+#target_link_libraries(replico_tests replico gtest gtest_main)
